@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.eggs/
+dist/
+build/
+*.pem
+id_ed25519
+recovered_*

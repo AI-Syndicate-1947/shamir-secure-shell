@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shamir Secret Sharing — From private key to shares (interactive)</title>
+  <style>
+    :root {
+      --bg: #0f1219;
+      --panel: #171c28;
+      --text: #e8ecf4;
+      --muted: #9aa3b5;
+      --accent: #6ee7ff;
+      --accent2: #a78bfa;
+      --warn: #fbbf24;
+      --ok: #34d399;
+      --danger: #fb7185;
+      --border: #2a3142;
+      --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+      --mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: radial-gradient(1200px 800px at 10% -10%, #1a2240 0%, var(--bg) 55%);
+      color: var(--text);
+      line-height: 1.55;
+      min-height: 100vh;
+    }
+    header {
+      padding: 2rem 1.5rem 1rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    header h1 {
+      font-size: 1.65rem;
+      font-weight: 650;
+      margin: 0 0 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    header p.lead {
+      margin: 0;
+      color: var(--muted);
+      max-width: 65ch;
+    }
+    .tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1.5rem 3rem;
+      display: grid;
+      gap: 1.25rem;
+    }
+    @media (min-width: 960px) {
+      main { grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); align-items: start; }
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.1rem 1.25rem;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    }
+    .card h2 {
+      margin: 0 0 0.65rem;
+      font-size: 1.1rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .card h3 {
+      margin: 1rem 0 0.4rem;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+    .muted { color: var(--muted); font-size: 0.92rem; }
+    .mono { font-family: var(--mono); font-size: 0.85rem; }
+    .math {
+      font-family: "Cambria Math", "Times New Roman", serif;
+      font-size: 1.02rem;
+    }
+    ul.compact { margin: 0.4rem 0 0 1.1rem; padding: 0; }
+    ul.compact li { margin: 0.25rem 0; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem 1rem;
+      align-items: center;
+      margin-top: 0.75rem;
+    }
+    label.field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    input[type="range"] { width: 140px; accent-color: var(--accent); }
+    select, button {
+      font: inherit;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #1e2433;
+      color: var(--text);
+      padding: 0.45rem 0.75rem;
+    }
+    button.primary {
+      background: linear-gradient(135deg, #2563eb, #06b6d4);
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.ghost { cursor: pointer; background: transparent; }
+    .steps {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin: 0.75rem 0 0.5rem;
+    }
+    .steps button {
+      font-size: 0.78rem;
+      padding: 0.35rem 0.55rem;
+      border-radius: 999px;
+    }
+    .steps button.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(110,231,255,0.25);
+    }
+    .viz-wrap {
+      position: sticky;
+      top: 0.75rem;
+    }
+    #stage {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 12px;
+      background: #0b0e14;
+      border: 1px solid var(--border);
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      margin-top: 0.6rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .dotline { display: flex; align-items: center; gap: 0.35rem; }
+    .swatch {
+      width: 10px; height: 10px; border-radius: 50%;
+      display: inline-block;
+    }
+    .callout {
+      margin-top: 0.75rem;
+      padding: 0.65rem 0.75rem;
+      border-left: 3px solid var(--warn);
+      background: rgba(251,191,36,0.08);
+      border-radius: 0 8px 8px 0;
+      font-size: 0.88rem;
+    }
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+    @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
+    .pill {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 6px;
+      background: #222838;
+      border: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+    }
+    .fade-in { animation: fadein 0.5s ease both; }
+    @keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    kbd { font-family: var(--mono); font-size: 0.82em; border: 1px solid var(--border); padding: 0.05rem 0.35rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="tag">Local visualization · no network · no AWS</span>
+    <h1>Demystifying Shamir’s Secret Sharing on your private key</h1>
+    <p class="lead">
+      This page walks through the <strong>encrypt-then-split</strong> design used in this repository:
+      your key file is sealed with <strong>AES-256-GCM</strong>; only the <strong>32-byte AES key</strong> is turned into Shamir shares over a prime field.
+      The animation uses arithmetic modulo <span class="math">17</span> so every step matches pencil-and-paper math
+      (<a href="../SHAMIR_SECRET_SHARING_MATH.md" style="color:var(--accent)">SHAMIR_SECRET_SHARING_MATH.md</a>).
+      The real tool uses the Mersenne prime <span class="math">2<sup>521</sup> − 1</span> instead — same ideas, bigger numbers.
+    </p>
+  </header>
+
+  <main>
+    <section class="card" id="narrative">
+      <div class="steps" id="stepButtons" aria-label="Story steps"></div>
+      <div id="stepContent"></div>
+
+      <h3 style="margin-top:1rem">Why a Galois field (finite field)?</h3>
+      <p class="muted" style="margin:0">
+        Shamir’s construction needs a place where polynomials behave predictably: you want a unique interpolating polynomial
+        of degree ≤ <span class="math">k−1</span> through any <span class="math">k</span> distinct points.
+        Over the integers <span class="math">ℤ</span>, “division” is messy (no modular wrap). Over a <strong>field</strong>
+        <span class="math">𝔽<sub>p</sub></span> with <span class="math">p</span> prime, addition, multiplication, and <em>division by nonzero</em>
+        are all well-defined modulo <span class="math">p</span>. That is exactly <span class="math">𝔽<sub>p</sub></span> — the Galois field of order <span class="math">p</span>.
+        Nonzero elements have inverses, so Lagrange denominators like <span class="math">(x<sub>i</sub> − x<sub>j</sub>)</span> never collapse to something non-invertible
+        as long as <span class="math">x</span>-coordinates are distinct. The secret <span class="math">s</span> and every coefficient live in the same finite set,
+        so “random polynomial” and “uniform uncertainty with fewer than <span class="math">k</span> shares” are the standard SSS guarantees.
+      </p>
+
+      <div class="controls" style="margin-top:1rem">
+        <label class="field">Threshold <span class="mono">k</span>
+          <span><input type="range" id="kRange" min="2" max="5" value="3" /> <span id="kVal" class="pill">k = 3</span></span>
+        </label>
+        <label class="field">Total shares <span class="mono">n</span>
+          <span><input type="range" id="nRange" min="3" max="10" value="5" /> <span id="nVal" class="pill">n = 5</span></span>
+        </label>
+        <label class="field">Prime <span class="mono">p</span> (demo)
+          <select id="pSelect">
+            <option value="17" selected>17 (hand-checkable)</option>
+            <option value="23">23</option>
+            <option value="31">31</option>
+          </select>
+        </label>
+        <button type="button" class="primary" id="regenBtn">New random polynomial</button>
+        <button type="button" class="ghost" id="playBtn">Replay step animation</button>
+      </div>
+      <p class="muted" style="margin-top:0.6rem;font-size:0.82rem">
+        Changing <span class="mono">k</span>, <span class="mono">n</span>, or <span class="mono">p</span> regenerates coefficients. The story text always describes the general case.
+      </p>
+    </section>
+
+    <section class="card viz-wrap">
+      <h2>Animated board</h2>
+      <svg id="stage" viewBox="0 0 520 420" role="img" aria-label="Visualization of encryption flow and polynomial shares">
+        <defs>
+          <linearGradient id="gKey" x1="0" x2="1">
+            <stop offset="0%" stop-color="#6ee7ff" />
+            <stop offset="100%" stop-color="#a78bfa" />
+          </linearGradient>
+          <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="4" result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+        <!-- Scene-specific groups -->
+        <g id="layerFlow"></g>
+        <g id="layerPlot"></g>
+        <g id="layerCaption"></g>
+      </svg>
+      <div class="legend">
+        <span class="dotline"><span class="swatch" style="background:#6ee7ff"></span> AES key / secret <span class="mono">s = f(0)</span></span>
+        <span class="dotline"><span class="swatch" style="background:#fbbf24"></span> Ciphertext (schematic)</span>
+        <span class="dotline"><span class="swatch" style="background:#34d399"></span> Shares <span class="mono">(x, y)</span></span>
+        <span class="dotline"><span class="swatch" style="background:#a78bfa"></span> Lagrange weights at 0</span>
+      </div>
+      <div class="callout" id="liveStats"></div>
+    </section>
+  </main>
+
+  <script>
+(function () {
+  const P_DEFAULT = 17;
+
+  function mod(a, m) {
+    let r = a % m;
+    if (r < 0) r += m;
+    return r;
+  }
+
+  function modInv(a, p) {
+    a = mod(a, p);
+    if (a === 0) throw new Error("no inverse");
+    let t = 0, newT = 1, r = p, newR = a;
+    while (newR !== 0) {
+      const q = Math.floor(r / newR);
+      [t, newT] = [newT, t - q * newT];
+      [r, newR] = [newR, r - q * newR];
+    }
+    if (r > 1) throw new Error("not invertible");
+    if (t < 0) t += p;
+    return t;
+  }
+
+  function evalPoly(coeffs, x, p) {
+    // coeffs[d] = coefficient of x^d, constant term coeffs[0] = s
+    let acc = 0, xp = 1;
+    for (let d = 0; d < coeffs.length; d++) {
+      acc = mod(acc + coeffs[d] * xp, p);
+      xp = mod(xp * x, p);
+    }
+    return acc;
+  }
+
+  function lagrangeAtZero(points, p) {
+    // points: [{x,y}, ...] distinct x
+    const k = points.length;
+    let sum = 0;
+    const terms = [];
+    for (let i = 0; i < k; i++) {
+      let num = 1, den = 1;
+      for (let j = 0; j < k; j++) {
+        if (j === i) continue;
+        num = mod(num * (0 - points[j].x), p);
+        den = mod(den * (points[i].x - points[j].x), p);
+      }
+      const li0 = mod(num * modInv(den, p), p);
+      const contrib = mod(points[i].y * li0, p);
+      terms.push({ i: i + 1, xi: points[i].x, yi: points[i].y, li0, contrib });
+      sum = mod(sum + contrib, p);
+    }
+    return { secret: sum, terms };
+  }
+
+  function randomCoeffs(k, p, rng) {
+    const coeffs = [mod(rng(), p)];
+    for (let i = 1; i < k; i++) coeffs.push(mod(rng(), p));
+    return coeffs;
+  }
+
+  function mulberry32(a) {
+    return function () {
+      let t = (a += 0x6d2b79f5);
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const state = {
+    p: P_DEFAULT,
+    k: 3,
+    n: 5,
+    coeffs: [],
+    seed: 1,
+    step: 0,
+    animToken: 0,
+  };
+
+  function ensureKN() {
+    if (state.n < state.k) state.n = state.k;
+    document.getElementById("nRange").min = String(state.k);
+    if (parseInt(document.getElementById("nRange").value, 10) < state.k) {
+      document.getElementById("nRange").value = String(state.k);
+      state.n = state.k;
+    }
+  }
+
+  function regenerate() {
+    state.seed = (state.seed + 1) | 0;
+    const rng = mulberry32(state.seed * 977 + state.k * 131 + state.n * 911 + state.p * 31337);
+    const rndInt = () => Math.floor(rng() * state.p);
+    state.coeffs = randomCoeffs(state.k, state.p, rndInt);
+    renderStats();
+    renderStepContent();
+    renderViz();
+  }
+
+  function shares() {
+    const out = [];
+    for (let x = 1; x <= state.n; x++) {
+      out.push({ x, y: evalPoly(state.coeffs, x, state.p) });
+    }
+    return out;
+  }
+
+  function firstKShares() {
+    return shares().slice(0, state.k);
+  }
+
+  function renderStats() {
+    const s = state.coeffs[0];
+    const polyStr =
+      "f(X) = " +
+      state.coeffs
+        .map((c, d) => {
+          if (d === 0) return String(c);
+          if (d === 1) return (c === 0 ? "" : (c === 1 ? "X" : c + "·X"));
+          return (c === 0 ? "" : (c === 1 ? "X^" + d : c + "·X^" + d));
+        })
+        .filter((t, d) => d === 0 || t !== "0" && t !== "")
+        .join(" + ")
+        .replace(/\+\s*\+/g, "+")
+        .replace(/\+\s*\-/g, "- ")
+      + " (mod " + state.p + ")";
+    const pts = shares()
+      .map((p) => "(" + p.x + ", " + p.y + ")")
+      .join(", ");
+    const rec = lagrangeAtZero(firstKShares(), state.p);
+    const chk = rec.secret === s ? "✓ matches f(0)" : "≠ f(0) (bug)";
+    document.getElementById("liveStats").innerHTML =
+      "<strong>Current demo secret</strong> <span class='mono'>s = " + s + "</span> in 𝔽<sub>" + state.p + "</sub>.<br/>" +
+      "<span class='mono'>" + polyStr + "</span><br/>" +
+      "<strong>Shares</strong> (first " + state.n + " positive x): <span class='mono'>" + pts + "</span><br/>" +
+      "<strong>Lagrange recovery</strong> using first <span class='mono'>k=" + state.k + "</span> shares: " +
+      "<span class='mono'>f(0) = " + rec.secret + "</span> (" + chk + ").";
+  }
+
+  const NS = "http://www.w3.org/2000/svg";
+  const $flow = document.getElementById("layerFlow");
+  const $plot = document.getElementById("layerPlot");
+  const $cap = document.getElementById("layerCaption");
+
+  function clear(el) {
+    while (el.firstChild) el.removeChild(el.firstChild);
+  }
+
+  function textEl(x, y, str, opts = {}) {
+    const t = document.createElementNS(NS, "text");
+    t.setAttribute("x", x);
+    t.setAttribute("y", y);
+    t.setAttribute("fill", opts.fill || "#e8ecf4");
+    t.setAttribute("font-size", opts.size || "13");
+    t.setAttribute("font-family", "system-ui,Segoe UI,sans-serif");
+    if (opts.anchor) t.setAttribute("text-anchor", opts.anchor);
+    t.textContent = str;
+    return t;
+  }
+
+  function rectEl(x, y, w, h, fill, stroke, rx = 8) {
+    const r = document.createElementNS(NS, "rect");
+    r.setAttribute("x", x);
+    r.setAttribute("y", y);
+    r.setAttribute("width", w);
+    r.setAttribute("height", h);
+    r.setAttribute("rx", rx);
+    r.setAttribute("fill", fill);
+    r.setAttribute("stroke", stroke || "none");
+    return r;
+  }
+
+  function lineEl(x1, y1, x2, y2, stroke, sw = 2, dash) {
+    const l = document.createElementNS(NS, "line");
+    l.setAttribute("x1", x1);
+    l.setAttribute("y1", y1);
+    l.setAttribute("x2", x2);
+    l.setAttribute("y2", y2);
+    l.setAttribute("stroke", stroke);
+    l.setAttribute("stroke-width", sw);
+    if (dash) l.setAttribute("stroke-dasharray", dash);
+    return l;
+  }
+
+  function circleEl(cx, cy, r, fill, stroke) {
+    const c = document.createElementNS(NS, "circle");
+    c.setAttribute("cx", cx);
+    c.setAttribute("cy", cy);
+    c.setAttribute("r", r);
+    c.setAttribute("fill", fill);
+    if (stroke) {
+      c.setAttribute("stroke", stroke);
+      c.setAttribute("stroke-width", "2");
+    }
+    return c;
+  }
+
+  function plotScene(highlightLagrange) {
+    clear($plot);
+    const p = state.p;
+    const padL = 50, padR = 20, padT = 20, padB = 40;
+    const W = 520 - padL - padR, H = 260 - padT - padB;
+    const ox = padL, oy = 280 - padB;
+    const xmax = Math.max(state.n, 6);
+    const xToPx = (x) => ox + (x / xmax) * W;
+    const yToPx = (y) => oy - (y / (p - 1)) * H;
+
+    $plot.appendChild(rectEl(20, 40, 480, 260, "#0b0e14", "#2a3142", 10));
+
+    // axes
+    $plot.appendChild(lineEl(ox, oy, ox + W, oy, "#3d4a63", 2));
+    $plot.appendChild(lineEl(ox, oy, ox, oy - H, "#3d4a63", 2));
+    $plot.appendChild(textEl(ox + W / 2, oy + 28, "x (share index)", { fill: "#9aa3b5", anchor: "middle" }));
+    $plot.appendChild(textEl(18, oy - H / 2, "y = f(x) mod p", { fill: "#9aa3b5", anchor: "middle", size: "12" }));
+    $plot.appendChild(textEl(ox - 25, oy + 4, "0", { fill: "#6b7280", size: "11" }));
+
+    for (let x = 1; x <= xmax; x++) {
+      const px = xToPx(x);
+      $plot.appendChild(lineEl(px, oy, px, oy - H, "#1f2937", 1, "4 4"));
+      $plot.appendChild(textEl(px, oy + 16, String(x), { fill: "#6b7280", anchor: "middle", size: "11" }));
+    }
+    for (let y = 0; y < p; y += Math.ceil(p / 6)) {
+      const py = yToPx(y);
+      $plot.appendChild(lineEl(ox, py, ox + W, py, "#1f2937", 1, "4 4"));
+      $plot.appendChild(textEl(ox - 8, py + 4, String(y), { fill: "#6b7280", anchor: "end", size: "10" }));
+    }
+
+    const pts = shares();
+    const polyline = document.createElementNS(NS, "polyline");
+    const ptsLine = [];
+    for (let x = 0; x <= xmax; x++) {
+      const y = evalPoly(state.coeffs, x, p);
+      ptsLine.push(xToPx(x) + "," + yToPx(y));
+    }
+    polyline.setAttribute("points", ptsLine.join(" "));
+    polyline.setAttribute("fill", "none");
+    polyline.setAttribute("stroke", "rgba(167,139,250,0.55)");
+    polyline.setAttribute("stroke-width", "2");
+    $plot.appendChild(polyline);
+
+    // secret at x=0
+    const s = state.coeffs[0];
+    $plot.appendChild(circleEl(xToPx(0), yToPx(s), 7, "#6ee7ff", "#99f6ff"));
+    $plot.appendChild(textEl(xToPx(0) - 6, yToPx(s) - 12, "s", { fill: "#6ee7ff", size: "12" }));
+
+    pts.forEach((pt, idx) => {
+      const cx = xToPx(pt.x);
+      const cy = yToPx(pt.y);
+      const used = idx < state.k;
+      const fill = used ? "#34d399" : "rgba(52,211,153,0.35)";
+      const stroke = used ? "#6ee7b0" : "rgba(110,231,183,0.5)";
+      $plot.appendChild(circleEl(cx, cy, used ? 7 : 5, fill, stroke));
+      $plot.appendChild(textEl(cx + 8, cy - 8, "(" + pt.x + "," + pt.y + ")", { fill: used ? "#d1fae5" : "#64748b", size: "11" }));
+    });
+
+    if (highlightLagrange) {
+      const rec = lagrangeAtZero(firstKShares(), p);
+      let lx = ox + W - 10;
+      let ly = 60;
+      $plot.appendChild(textEl(lx, ly, "Lagrange @ 0", { fill: "#a78bfa", anchor: "end", size: "12" }));
+      ly += 16;
+      rec.terms.forEach((t) => {
+        const line = "y" + t.xi + "·ℓ" + t.xi + "(0) = " + t.yi + "·" + t.li0 + " ≡ " + t.contrib + " (" + p + ")";
+        $plot.appendChild(textEl(lx, ly, line, { fill: "#c4b5fd", anchor: "end", size: "10" }));
+        ly += 14;
+      });
+      $plot.appendChild(textEl(lx, ly, "Sum ≡ " + rec.secret, { fill: "#fde68a", anchor: "end", size: "11" }));
+    }
+  }
+
+  function flowScene(progress) {
+    clear($flow);
+    clear($cap);
+    // progress 0..1 anim along pipeline (fits viewBox width 520)
+    const x0 = 14, y0 = 68;
+    const gap = 10;
+    const stages = [
+      { label: "Key file\n(bytes)", w: 78, color: "#334155" },
+      { label: "AES-256\n-GCM", w: 76, color: "#1e3a5f" },
+      { label: "Cipher +\nnonce", w: 78, color: "#713f12" },
+      { label: "AES key\n→ s ∈ 𝔽_p", w: 84, color: "#164e63" },
+      { label: "Shamir\n(x, y)", w: 78, color: "#14532d" },
+    ];
+    let x = x0;
+    stages.forEach((st, i) => {
+      const h = 62;
+      const r = rectEl(x, y0, st.w, h, st.color, "#475569", 8);
+      r.setAttribute("opacity", String(0.25 + 0.75 * Math.min(1, Math.max(0, progress * stages.length - i))));
+      $flow.appendChild(r);
+      const lines = st.label.split("\n");
+      lines.forEach((ln, j) => {
+        $flow.appendChild(textEl(x + st.w / 2, y0 + 20 + j * 12, ln, { anchor: "middle", size: "9.5", fill: "#e5e7eb" }));
+      });
+      if (i < stages.length - 1) {
+        const ax = x + st.w + 2;
+        const bx = x + st.w + 18;
+        const my = y0 + h / 2;
+        const arrProg = Math.min(1, Math.max(0, progress * stages.length - i - 0.2));
+        $flow.appendChild(lineEl(ax, my, ax + (bx - ax) * arrProg, my, "#6ee7ff", 2.5));
+        if (arrProg > 0.95) {
+          $flow.appendChild(textEl((ax + bx) / 2, my - 10, "→", { anchor: "middle", fill: "#6ee7ff", size: "12" }));
+        }
+      }
+      x += st.w + gap;
+    });
+    $cap.appendChild(
+      textEl(
+        20,
+        20,
+        "Schematic pipeline — GCM protects file bytes; Shamir protects the symmetric key.",
+        { fill: "#9aa3b5", size: "12" }
+      )
+    );
+  }
+
+  function renderViz() {
+    const step = state.step;
+    clear($plot);
+    clear($flow);
+    clear($cap);
+    if (step <= 2) {
+      flowScene(step === 2 ? 1 : step === 1 ? 0.55 : 0.2);
+    } else if (step === 3) {
+      flowScene(1);
+      plotScene(false);
+      $cap.appendChild(textEl(20, 330, "Points on the curve are evaluations of the same degree-(k−1) polynomial; green = first k used for recovery.", { fill: "#9aa3b5", size: "12" }));
+    } else if (step === 4) {
+      flowScene(1);
+      plotScene(true);
+      $cap.appendChild(textEl(20, 330, "Lagrange: f(0) = Σ y_i · ℓ_i(0). Each ℓ_i(0) depends only on x-coordinates.", { fill: "#9aa3b5", size: "12" }));
+    } else if (step === 5) {
+      flowScene(1);
+      plotScene(true);
+      $cap.appendChild(textEl(20, 330, "Decrypt ciphertext with the recovered AES key → original private key bytes (GCM verifies integrity).", { fill: "#9aa3b5", size: "12" }));
+    } else {
+      flowScene(1);
+      plotScene(false);
+    }
+  }
+
+  async function animateProgress(from, to, ms, token) {
+    const t0 = performance.now();
+    return new Promise((resolve) => {
+      function frame(now) {
+        if (token !== state.animToken) return resolve();
+        const u = Math.min(1, (now - t0) / ms);
+        const e = u < 1 ? 1 - Math.pow(1 - u, 3) : 1;
+        const v = from + (to - from) * e;
+        flowScene(v);
+        if (u < 1) requestAnimationFrame(frame);
+        else resolve();
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  const steps = [
+    {
+      title: "1 · The object you care about",
+      body: `
+        <p class="muted" style="margin-top:0">Your <strong>OpenSSH / PEM private key</strong> is just bytes on disk. The tool never applies Shamir directly to that long bytestring — doing so would mean either an enormous prime or thousands of independent polynomials.</p>
+        <p class="muted">Instead, the file is treated as <strong>plaintext</strong> for a modern AEAD.</p>
+      `,
+    },
+    {
+      title: "2 · AES-256-GCM envelope",
+      body: `
+        <p class="muted" style="margin-top:0">A fresh <strong>256-bit AES key</strong> is drawn from a cryptographic RNG. The entire key file is encrypted with <strong>AES-256-GCM</strong>: you get <span class="mono">ciphertext</span>, a <span class="mono">nonce</span> (IV), and an authentication <span class="mono">tag</span>.</p>
+        <p class="muted">Every emitted share carries the <strong>same</strong> ciphertext envelope. Possessing one share therefore does <em>not</em> reveal the private key without the threshold of Shamir points — offline guessing remains bounded by AES and the tag.</p>
+      `,
+    },
+    {
+      title: "3 · What Shamir actually splits",
+      body: () => `
+        <p class="muted" style="margin-top:0">Only the <strong>32-byte AES key</strong> is interpreted as an integer <span class="math">s</span> and shared. In code this is big-endian decoding; it must satisfy <span class="math">0 ≤ s &lt; p</span> for the chosen prime field <span class="math">𝔽<sub>p</sub></span>.</p>
+        <p class="muted">This project fixes <span class="math">p = 2<sup>521</sup> − 1</span> so any 256-bit key fits comfortably. <strong>On the right</strong> we use <span class="math">p = ${state.p}</span> so you can watch the same formulas with small numbers.</p>
+      `,
+    },
+    {
+      title: "4 · Building the polynomial (splitting)",
+      body: `
+        <p class="muted" style="margin-top:0">Pick threshold <span class="math">k ≥ 2</span> and total shares <span class="math">n ≥ k</span>. Choose uniform random coefficients <span class="math">a₁,…,a<sub>k−1</sub> ∈ 𝔽<sub>p</sub></span> and define</p>
+        <p class="math" style="margin:0.4rem 0">f(X) = s + a₁X + ⋯ + a<sub>k−1</sub>X<sup>k−1</sup> &nbsp;(mod p).</p>
+        <p class="muted">The <strong>secret is the constant term</strong>: <span class="math">f(0) = s</span>. Each share is a public evaluation point <span class="math">(xᵢ, yᵢ)</span> with distinct nonzero <span class="math">xᵢ</span>, usually <span class="math">xᵢ = i</span>, and <span class="math">yᵢ = f(xᵢ)</span>.</p>
+        <p class="muted">Fewer than <span class="math">k</span> points are consistent with <em>every</em> possible secret in the field (perfect privacy in the standard Shamir model). That fact needs the field structure — see the Galois note beside the board.</p>
+      `,
+    },
+    {
+      title: "5 · Reconstruction (Lagrange at zero)",
+      body: `
+        <p class="muted" style="margin-top:0">Any <span class="math">k</span> distinct shares determine a unique polynomial of degree ≤ <span class="math">k−1</span>. Rather than recovering all coefficients, we only ask for <span class="math">f(0)</span> via Lagrange interpolation:</p>
+        <p class="math" style="margin:0.4rem 0">f(0) = Σ<sub>i=1</sub><sup>k</sup> yᵢ · ℓᵢ(0),</p>
+        <p class="muted">where each weight <span class="math">ℓᵢ(0)</span> is a product of terms <span class="math">(0 − xⱼ)/(xᵢ − xⱼ)</span> in <span class="math">𝔽<sub>p</sub></span>. Denominators are never zero if the <span class="math">x</span> values are distinct — another place fields matter.</p>
+        <p class="muted">The purple trace on the plot connects integer evaluations; highlighted green dots are the first <span class="mono">k</span> shares used in the sum shown on the chart.</p>
+      `,
+    },
+    {
+      title: "6 · Closing the loop (decrypt)",
+      body: `
+        <p class="muted" style="margin-top:0">After Lagrange yields <span class="math">s</span>, reassemble the 32-byte AES key, run <strong>AES-GCM decrypt</strong> with the copied nonce and ciphertext, verify the tag, and compare the SHA-256 fingerprint to the value embedded in the shares.</p>
+        <p class="muted">You now have the <strong>original private key bytes</strong> — the same journey the CLI performs, without persisting the reconstructed key unless you ask it to.</p>
+      `,
+    },
+  ];
+
+  function renderStepContent() {
+    const i = state.step;
+    const s = steps[i];
+    const bodyHtml = typeof s.body === "function" ? s.body() : s.body;
+    document.getElementById("stepContent").innerHTML =
+      "<h2 class='fade-in'>" + s.title + "</h2>" +
+      "<div class='fade-in'>" + bodyHtml + "</div>";
+    Array.from(document.querySelectorAll("#stepButtons button")).forEach((btn, idx) => {
+      btn.classList.toggle("active", idx === i);
+    });
+  }
+
+  function buildStepButtons() {
+    const wrap = document.getElementById("stepButtons");
+    clear(wrap);
+    steps.forEach((s, idx) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = String(idx + 1);
+      b.title = s.title.replace(/^\d+ · /, "");
+      b.addEventListener("click", async () => {
+        state.step = idx;
+        state.animToken++;
+        renderStepContent();
+        renderViz();
+        if (idx === 1) {
+          const t = ++state.animToken;
+          await animateProgress(0.15, 1, 1200, t);
+        }
+      });
+      wrap.appendChild(b);
+    });
+  }
+
+  function wireControls() {
+    const kRange = document.getElementById("kRange");
+    const nRange = document.getElementById("nRange");
+    const pSel = document.getElementById("pSelect");
+    kRange.addEventListener("input", () => {
+      state.k = parseInt(kRange.value, 10);
+      document.getElementById("kVal").textContent = "k = " + state.k;
+      ensureKN();
+      document.getElementById("nVal").textContent = "n = " + state.n;
+      regenerate();
+    });
+    nRange.addEventListener("input", () => {
+      state.n = parseInt(nRange.value, 10);
+      ensureKN();
+      document.getElementById("nVal").textContent = "n = " + state.n;
+      regenerate();
+    });
+    pSel.addEventListener("change", () => {
+      state.p = parseInt(pSel.value, 10);
+      regenerate();
+    });
+    document.getElementById("regenBtn").addEventListener("click", () => regenerate());
+    document.getElementById("playBtn").addEventListener("click", async () => {
+      const t = ++state.animToken;
+      state.step = 1;
+      renderStepContent();
+      renderViz();
+      await animateProgress(0.1, 1, 1400, t);
+    });
+  }
+
+  buildStepButtons();
+  wireControls();
+  ensureKN();
+  regenerate();
+  state.step = 0;
+  renderStepContent();
+  renderViz();
+})();
+  </script>
+</body>
+</html>

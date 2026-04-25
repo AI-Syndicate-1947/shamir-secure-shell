@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shamir-ssh"
+version = "0.1.0"
+description = "Split OpenSSH/PEM private keys with Shamir secret sharing (AES-GCM envelope)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "cryptography>=42.0.0",
+]
+
+[project.scripts]
+shamir-ssh = "shamir_ssh.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "boto3>=1.34.0",
+]
+aws = [
+    "boto3>=1.34.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
