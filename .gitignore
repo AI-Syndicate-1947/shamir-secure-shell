@@ -8,3 +8,5 @@ build/
 *.pem
 id_ed25519
 recovered_*
+rpi5_pr_key/
+venv

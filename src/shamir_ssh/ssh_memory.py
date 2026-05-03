@@ -73,6 +73,9 @@ def run_ssh_with_ephemeral_agent(
     env.update(agent_env)
     # Avoid picking up a pre-existing agent from the parent shell.
     env.pop("SSH_CONNECTION", None)
+    # Prevent ssh-add from attempting graphical passphrase prompts (ssh-askpass)
+    # which may not be available in non-interactive/non-graphical environments.
+    env["SSH_ASKPASS_REQUIRE"] = "never"
 
     try:
         add_proc = subprocess.run(
